@@ -1,6 +1,6 @@
 # 2022+ Subaru WRX Dynamic LED Reflector Platform
 
-![Project Header](path/to/your/photo.jpg)
+![Project Header](placeholder.jpg)
 
 A full-stack hardware and software solution to replace static OEM rear reflectors with addressable, reactive LED modules. This project features a modular PCB designed for the VB chassis but adaptable to any 12V automotive lighting application.
 
@@ -10,9 +10,10 @@ A full-stack hardware and software solution to replace static OEM rear reflector
 - **Software:** C++ Firmware (Arduino) utilizing **FastLED** for sequential animations and interrupt-driven brake logic.
 
 ## 🛠️ Hardware Stack
-- **MCU:** [Your Microcontroller Name]
+- **MCU:** ESP-32-S3-WROOM
 - **LEDs:** WS2812B Addressable Strips
-- **Design Tools:** KiCad 7.0, Autodesk Fusion 360, Adobe Lightroom (Documentation)
+- **Design Tools:** KiCad 9.0, Autodesk Fusion 360, Adobe Lightroom (Documentation)
+- **3D Printer:** Bambu Labs P1S, PLA & PETG
 
 ## 📂 Repository Structure
 - `/Firmware`: Arduino source code (.ino)
