@@ -24,9 +24,9 @@ A full-stack hardware and software solution to replace static OEM rear reflector
 ## 🖨️ 3D Printing
 - When using the provided *.3mf* files please try not to adjust much.
 - The filament used for the lens is as follows
-- - Overture Transparent PETG
-- - Bambu Translucent Grey PETG
-- - Overture Transparent Red PETG
+  - Overture Transparent PETG
+  - Bambu Translucent Grey PETG
+  - Overture Transparent Red PETG
 
 ## ⚖️ License
 Code/Firmware: This project is licensed under the **GNU GPLv3**. You are free to use and modify it, but any derivative works must also be open-sourced under the same license.
