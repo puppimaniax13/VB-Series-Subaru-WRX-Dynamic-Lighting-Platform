@@ -3,18 +3,16 @@
 #include <FastLED.h>
 #include <Preferences.h>
 
-// --- GPIO Mapping (S3-WROOM-1) ---
+#define MAX_LEDS        150 // Physical max memory allocation
 #define GPIO_DRL_IN     4   
 #define GPIO_BRAKE_IN   5   
-#define GPIO_REVERSE_IN 6   
 #define GPIO_TURN_L_IN  7   
 #define GPIO_TURN_R_IN  11  
 #define GPIO_DATA_1     9   
 #define GPIO_DATA_2     10  
-#define NUM_LEDS        20 
 
-CRGB leds1[NUM_LEDS];
-CRGB leds2[NUM_LEDS];
+CRGB leds1[MAX_LEDS];
+CRGB leds2[MAX_LEDS];
 
 Preferences prefs;
 struct Config {
@@ -26,6 +24,7 @@ struct Config {
   bool turnRainbow;
   uint16_t wipeSpeed;
   int8_t fineTune; 
+  uint16_t numLeds; // Added dynamic LED count
 } settings;
 
 unsigned long turnStartL = 0, turnStartR = 0;
@@ -50,14 +49,13 @@ String getHTML() {
   html += ".tabs{display:flex;background:#222;border-radius:10px;padding:3px;margin:15px 0;border:1px solid #333;}";
   html += ".tab{flex:1;padding:10px;border-radius:8px;font-size:0.7rem;cursor:pointer;color:#666;font-weight:bold;}";
   html += ".active-tab{background:#333;color:var(--accent);}";
-  html += "input[type='color']{width:100%;height:45px;border:none;border-radius:10px;background:#222;padding:4px;}";
+  html += "input[type='color'], input[type='number']{width:100%;height:45px;border:none;border-radius:10px;background:#222;color:white;padding:4px;text-align:center;font-weight:bold;}";
   html += "input[type='range']{width:100%;margin:15px 0;accent-color:var(--accent);}";
   html += "button{width:100%;padding:16px;margin:10px 0;border-radius:12px;border:none;background:#2a2a2a;color:white;font-weight:bold;cursor:pointer;}";
   html += ".btn-sr{background:var(--accent);margin-bottom:20px;} .btn-sync{background:#ffa500;color:black;} .btn-rst{background:#331111;color:#ff5555;font-size:0.7rem;margin-top:25px;}";
   html += ".toggle-box{display:flex;justify-content:space-between;align-items:center;background:#222;padding:12px;border-radius:12px;margin:5px 0;}";
-  html += ".debug-text{display:none;font-family:monospace;font-size:0.65rem;color:#0f0;text-align:left;background:#000;padding:10px;border-radius:8px;margin-top:10px;border:1px solid #0f0;}";
   html += ".drop-content{display:none; overflow:hidden;} .val-label{color:var(--accent);float:right;}";
-  html += ".rbow-st{padding:15px;background:var(--rbow);border-radius:10px;margin-top:10px;font-size:0.75rem;font-weight:bold;text-shadow:1px 1px 2px #000;color:white;}";
+  html += ".rbow-st{padding:15px;background:var(--rbow);border-radius:10px;margin-top:10px;font-size:0.75rem;font-weight:bold;color:white;}";
   html += "label{font-size:0.6rem;color:#888;text-transform:uppercase;font-weight:bold;display:block;margin-bottom:5px;}</style></head><body>";
   
   html += "<div class='container'><h1 onclick='dCheck()'>AURA CORE</h1><div class='sub'>Universal Logic Controller</div>";
@@ -67,32 +65,34 @@ String getHTML() {
   html += "<div class='card'><label>Brightness <span id='bPct' class='val-label'>" + String(brightPct) + "%</span></label>";
   html += "<input type='range' min='0' max='255' value='" + String(settings.brightness) + "' oninput='uB(this.value)' onchange=\"fetch('/bright?val='+this.value)\"></div>";
 
-  // DRL
-  html += "<div class='card'><label>DRL Mode</label><div class='tabs'><div id='tDS' onclick=\"sM('d','solid')\" class='tab " + String(!settings.drlRainbow?"active-tab":"") + "'>SOLID</div><div id='tDR' onclick=\"sM('d','rainbow')\" class='tab " + String(settings.drlRainbow?"active-tab":"") + "'>RAINBOW</div></div>";
-  html += "<div id='dSC' style='display:" + String(!settings.drlRainbow?"block":"none") + "'><input type='color' value='#" + colorToHex(settings.drlColor) + "' onchange=\"fetch('/color?val='+this.value.replace('#',''))\"></div><div id='dRC' style='display:" + String(settings.drlRainbow?"block":"none") + "'><div class='rbow-st'>RAINBOW ACTIVE</div></div></div>";
-
-  // Turn
-  html += "<div class='card'><label>Turn Signal Mode</label><div class='tabs'><div id='tTS' onclick=\"sM('t','solid')\" class='tab " + String(!settings.turnRainbow?"active-tab":"") + "'>SOLID</div><div id='tTR' onclick=\"sM('t','rainbow')\" class='tab " + String(settings.turnRainbow?"active-tab":"") + "'>RAINBOW</div></div>";
-  html += "<div id='tSC' style='display:" + String(!settings.turnRainbow?"block":"none") + "'><input type='color' value='#" + colorToHex(settings.turnColor) + "' onchange=\"fetch('/tcolor?val='+this.value.replace('#',''))\"></div><div id='tRC' style='display:" + String(settings.turnRainbow?"block":"none") + "'><div class='rbow-st'>SPECTRAL WIPE ACTIVE</div></div></div>";
+  // DRL & Turn Cards (Standard)
+  html += "<div class='card'><label>DRL Mode</label><div class='tabs'><div id='tDS' onclick=\"sM('d','solid')\" class='tab " + String(!settings.drlRainbow?"active-tab":"") + "'>SOLID</div><div id='tDR' onclick=\"sM('d','rainbow')\" class='tab " + String(settings.drlRainbow?"active-tab":"") + "'>RAINBOW</div></div><div id='dSC' style='display:" + String(!settings.drlRainbow?"block":"none") + "'><input type='color' value='#" + colorToHex(settings.drlColor) + "' onchange=\"fetch('/color?val='+this.value.replace('#',''))\"></div><div id='dRC' style='display:" + String(settings.drlRainbow?"block":"none") + "'><div class='rbow-st'>RAINBOW ACTIVE</div></div></div>";
+  html += "<div class='card'><label>Turn Mode</label><div class='tabs'><div id='tTS' onclick=\"sM('t','solid')\" class='tab " + String(!settings.turnRainbow?"active-tab":"") + "'>SOLID</div><div id='tTR' onclick=\"sM('t','rainbow')\" class='tab " + String(settings.turnRainbow?"active-tab":"") + "'>RAINBOW</div></div><div id='tSC' style='display:" + String(!settings.turnRainbow?"block":"none") + "'><input type='color' value='#" + colorToHex(settings.turnColor) + "' onchange=\"fetch('/tcolor?val='+this.value.replace('#',''))\"></div><div id='tRC' style='display:" + String(settings.turnRainbow?"block":"none") + "'><div class='rbow-st'>SPECTRAL WIPE</div></div></div>";
 
   html += "<button class='btn-sr' id='sb' onclick=\"tS()\">ACTIVATE SHOWROOM</button>";
 
   // Tuner Tools
-  html += "<div class='card'><div onclick='tT()' style='cursor:pointer;'><span style='color:var(--accent);font-size:1.1rem;font-weight:bold;letter-spacing:1px;'>TUNER TOOLS &#9662;</span></div><div id='tc' class='drop-content'>";
-  html += "<div class='toggle-box' style='margin-top:20px;'><span>Swap L/R Sides</span><button onclick=\"fetch('/invert')\" style='width:auto;padding:8px 15px;margin:0;font-size:0.7rem;background:" + String(settings.invert ? "#ff0055" : "#333") + "'>" + String(settings.invert ? "INVERTED" : "NORMAL") + "</button></div>";
+  html += "<div class='card'><div onclick='tT()' style='cursor:pointer;'><span style='color:var(--accent);font-size:1.1rem;font-weight:bold;'>TUNER TOOLS &#9662;</span></div><div id='tc' class='drop-content'>";
+  
+  html += "<div style='margin-top:20px;'><label>LED Count (Per Side)</label><input type='number' value='" + String(settings.numLeds) + "' onchange=\"fetch('/setleds?val='+this.value)\"></div>";
+  
+  html += "<div class='toggle-box' style='margin-top:10px;'><span>Swap L/R Sides</span><button onclick=\"fetch('/invert')\" style='width:auto;padding:8px 15px;margin:0;font-size:0.7rem;background:" + String(settings.invert ? "#ff0055" : "#333") + "'>" + String(settings.invert ? "INVERTED" : "NORMAL") + "</button></div>";
+  
   html += "<div style='margin-top:20px;'><label>Timing Fine-Tune <span id='fV' class='val-label'>" + String(settings.fineTune) + "ms</span></label><input type='range' min='-15' max='15' value='" + String(settings.fineTune) + "' oninput='uF(this.value)' onchange=\"fetch('/fine?val='+this.value)\"></div>";
+  
   html += "<button class='btn-sync' onclick=\"this.innerText='WAITING FOR BLINKER...';fetch('/sync')\">RE-LEARN BLINK TIMING</button>";
-  html += "<div id='db' class='debug-text'>SPD: " + String(settings.wipeSpeed) + "ms | OFFSET: <span id='dbO'>" + String(settings.fineTune) + "</span>ms</div>";
-  html += "<button class='btn-rst' onclick=\"if(confirm('Reset all settings?'))fetch('/reset')\">FACTORY RESET DEVICE</button></div></div></div>";
+  
+  html += "<div id='db' style='display:none;font-family:monospace;font-size:0.65rem;color:#0f0;text-align:left;background:#000;padding:10px;border-radius:8px;margin-top:10px;border:1px solid #0f0;'>SPD: " + String(settings.wipeSpeed) + "ms | OFFSET: <span id='dbO'>" + String(settings.fineTune) + "</span>ms</div>";
+  html += "<button class='btn-rst' onclick=\"if(confirm('Reset all?'))fetch('/reset')\">FACTORY RESET</button></div></div></div>";
 
   html += "<script>let tC=0; function dCheck(){tC++; if(tC>=3){document.getElementById('db').style.display='block';} setTimeout(()=>tC=0,1000);}";
   html += "function tT(){let c=document.getElementById('tc'); c.style.display=(c.style.display=='block')?'none':'block';}";
   html += "function uB(v){document.getElementById('bPct').innerText=Math.round((v/255)*100)+'%';}";
   html += "function uF(v){document.getElementById('fV').innerText=v+'ms'; document.getElementById('dbO').innerText=v;}";
-  html += "function fetch(u){var x=new XMLHttpRequest();x.open('GET',u,true);x.onload=function(){if(u.includes('/invert')||u.includes('/fine')||u.includes('/sync')||u.includes('/reset'))location.reload();};x.send();}";
-  html += "function sM(t,m){let isR=(m=='rainbow'); if(t=='d'){document.getElementById('dSC').style.display=isR?'none':'block'; document.getElementById('dRC').style.display=isR?'block':'none'; document.getElementById('tDS').className=isR?'tab':'tab active-tab'; document.getElementById('tDR').className=isR?'tab active-tab':'tab'; fetch('/mode_d?val='+m);}";
-  html += "else{document.getElementById('tSC').style.display=isR?'none':'block'; document.getElementById('tRC').style.display=isR?'block':'none'; document.getElementById('tTS').className=isR?'tab':'tab active-tab'; document.getElementById('tTR').className=isR?'tab active-tab':'tab'; fetch('/mode_t?val='+m);}}";
-  html += "function tS(){let b=document.getElementById('sb'); if(b.innerText=='ACTIVATE SHOWROOM'){b.innerText='DEACTIVATE'; b.style.background='#ff0055'; fetch('/showroom?state=on');}else{b.innerText='ACTIVATE SHOWROOM'; b.style.background='#007aff'; fetch('/showroom?state=off');}}</script></body></html>";
+  html += "function fetch(u){var x=new XMLHttpRequest();x.open('GET',u,true);x.onload=function(){if(u.includes('/invert')||u.includes('/fine')||u.includes('/sync')||u.includes('/reset')||u.includes('/setleds'))location.reload();};x.send();}";
+  html += "function sM(t,m){let isR=(m=='rainbow'); if(t=='d'){document.getElementById('dSC').style.display=isR?'none':'block'; document.getElementById('dRC').style.display=isR?'block':'none'; fetch('/mode_d?val='+m);}";
+  html += "else{document.getElementById('tSC').style.display=isR?'none':'block'; document.getElementById('tRC').style.display=isR?'block':'none'; fetch('/mode_t?val='+m);} setTimeout(()=>location.reload(),300);}";
+  html += "function tS(){let b=document.getElementById('sb'); if(b.innerText=='ACTIVATE SHOWROOM'){fetch('/showroom?state=on'); b.innerText='DEACTIVATE'; b.style.background='#ff0055';}else{fetch('/showroom?state=off'); b.innerText='ACTIVATE SHOWROOM'; b.style.background='#007aff';}}</script></body></html>";
   return html;
 }
 
@@ -106,6 +106,7 @@ void saveConfig() {
   prefs.putBool("tr_r", settings.turnRainbow);
   prefs.putUInt("spd", settings.wipeSpeed);
   prefs.putChar("fine", settings.fineTune);
+  prefs.putUInt("nled", settings.numLeds);
   prefs.end();
 }
 
@@ -119,6 +120,7 @@ void loadConfig() {
   settings.turnRainbow = prefs.getBool("tr_r", false);
   settings.wipeSpeed = prefs.getUInt("spd", 35);
   settings.fineTune = prefs.getChar("fine", 0);
+  settings.numLeds = prefs.getUInt("nled", 20); // Default 20
   prefs.end();
 }
 
@@ -127,40 +129,42 @@ void handleSideLogic(int turnGpio, CRGB* strip, unsigned long &startTime) {
   if (turnActive) {
     if (startTime == 0) startTime = millis();
     int currentSpeed = settings.wipeSpeed + settings.fineTune;
-    if(currentSpeed < 5) currentSpeed = 5;
-    int progress = (millis() - startTime) / currentSpeed;
-    fadeToBlackBy(strip, NUM_LEDS, 110);
-    for(int i = 0; i < min(progress, NUM_LEDS); i++) {
+    int progress = (millis() - startTime) / max(currentSpeed, 1);
+    
+    fadeToBlackBy(strip, settings.numLeds, 110);
+    for(int i = 0; i < min((int)progress, (int)settings.numLeds); i++) {
       strip[i] = settings.turnRainbow ? CHSV((millis()/10)+(i*15), 255, 255) : settings.turnColor;
     }
   } else {
     if (startTime != 0) {
       uint16_t duration = millis() - startTime;
       if (duration > 150 && (settings.wipeSpeed == 35 || isSyncing)) { 
-        settings.wipeSpeed = duration / NUM_LEDS; 
+        settings.wipeSpeed = duration / settings.numLeds; 
         isSyncing = false;
         saveConfig(); 
       }
       startTime = 0;
     }
-    if (digitalRead(GPIO_BRAKE_IN)) fill_solid(strip, NUM_LEDS, CRGB::Red);
-    else if (digitalRead(GPIO_DRL_IN)) {
-      if (settings.drlRainbow) fill_rainbow(strip, NUM_LEDS, millis()/20, 255/NUM_LEDS);
-      else fill_solid(strip, NUM_LEDS, settings.drlColor);
-    } else fill_solid(strip, NUM_LEDS, CRGB::Black);
+    // DRL / Brake logic
+    if (digitalRead(GPIO_DRL_IN)) {
+      if (settings.drlRainbow) fill_rainbow(strip, settings.numLeds, millis()/20, 255/settings.numLeds);
+      else fill_solid(strip, settings.numLeds, settings.drlColor);
+    } else {
+      fill_solid(strip, settings.numLeds, CRGB::Black);
+    }
   }
 }
 
 void setup() {
   loadConfig();
-  pinMode(GPIO_DRL_IN, INPUT); pinMode(GPIO_BRAKE_IN, INPUT); 
-  pinMode(GPIO_TURN_L_IN, INPUT); pinMode(GPIO_TURN_R_IN, INPUT);
-  FastLED.addLeds<WS2812B, GPIO_DATA_1, GRB>(leds1, NUM_LEDS);
-  FastLED.addLeds<WS2812B, GPIO_DATA_2, GRB>(leds2, NUM_LEDS);
+  pinMode(GPIO_DRL_IN, INPUT); pinMode(GPIO_TURN_L_IN, INPUT); pinMode(GPIO_TURN_R_IN, INPUT);
+  FastLED.addLeds<WS2812B, GPIO_DATA_1, GRB>(leds1, MAX_LEDS);
+  FastLED.addLeds<WS2812B, GPIO_DATA_2, GRB>(leds2, MAX_LEDS);
   FastLED.setBrightness(settings.brightness);
   
   WiFi.softAP("AURA_CORE", "aura1234");
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *r){ r->send(200, "text/html", getHTML()); });
+  server.on("/setleds", HTTP_GET, [](AsyncWebServerRequest *r){ if(r->hasParam("val")){settings.numLeds=min((uint16_t)r->getParam("val")->value().toInt(), (uint16_t)MAX_LEDS); saveConfig();} r->send(200); });
   server.on("/bright", HTTP_GET, [](AsyncWebServerRequest *r){ if(r->hasParam("val")){settings.brightness=r->getParam("val")->value().toInt(); FastLED.setBrightness(settings.brightness); saveConfig();} r->send(200); });
   server.on("/color", HTTP_GET, [](AsyncWebServerRequest *r){ if(r->hasParam("val")){settings.drlColor=strtol(r->getParam("val")->value().c_str(),NULL,16); saveConfig();} r->send(200); });
   server.on("/tcolor", HTTP_GET, [](AsyncWebServerRequest *r){ if(r->hasParam("val")){settings.turnColor=strtol(r->getParam("val")->value().c_str(),NULL,16); saveConfig();} r->send(200); });
@@ -176,8 +180,8 @@ void setup() {
 
 void loop() {
   if (showroomActive) {
-    fill_rainbow(leds1, NUM_LEDS, millis()/20, 10);
-    fill_rainbow(leds2, NUM_LEDS, millis()/20, 10);
+    fill_rainbow(leds1, settings.numLeds, millis()/20, 10);
+    fill_rainbow(leds2, settings.numLeds, millis()/20, 10);
   } else {
     handleSideLogic(GPIO_TURN_L_IN, settings.invert?leds2:leds1, turnStartL);
     handleSideLogic(GPIO_TURN_R_IN, settings.invert?leds1:leds2, turnStartR);
